@@ -48,7 +48,7 @@ __get_version() { printf '%s\n' "${1:-$(cat "/dev/stdin")}" | awk -F. '{ printf(
 # Define Variables
 EXPECTED_OS="alpine"
 TEMPLATE_NAME="postgres"
-CONFIG_CHECK_FILE="config/postgresql.conf"
+CONFIG_CHECK_FILE="postgres/postgresql.conf"
 OVER_WRITE_INIT="yes"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 TMP_DIR="/tmp/config-$TEMPLATE_NAME"

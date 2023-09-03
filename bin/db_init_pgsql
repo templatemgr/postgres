@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+##@Version           :  202309021321-git
+# @@Author           :  Jason Hempstead
+# @@Contact          :  jason@casjaysdev.pro
+# @@License          :  WTFPL
+# @@ReadME           :  db_init_ppgsql --help
+# @@Copyright        :  Copyright: (c) 2023 Jason Hempstead, Casjays Developments
+# @@Created          :  Saturday, Sep 02, 2023 13:21 EDT
+# @@File             :  db_init_ppgsql
+# @@Description      :
+# @@Changelog        :  New script
+# @@TODO             :  Better documentation
+# @@Other            :
+# @@Resource         :
+# @@Terminal App     :  no
+# @@sudo/root        :  no
+# @@Template         :  bash/simple
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# shellcheck disable=SC2016
+# shellcheck disable=SC2031
+# shellcheck disable=SC2120
+# shellcheck disable=SC2155
+# shellcheck disable=SC2199
+# shellcheck disable=SC2317
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+APPNAME="$(basename "$0" 2>/dev/null)"
+VERSION="202309021321-git"
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# pipes fail
+set -o pipefail
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+[ -s "/config/secure/auth/root/postgres_name" ] && root_user_name="$(<"/config/secure/auth/root/postgres_name")"
+[ -s "/config/secure/auth/root/postgres_pass" ] && root_user_pass="$(<"/config/secure/auth/root/postgres_pass")"
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Argument/Option settings
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+LONGOPTS="database:,user-username:,user-password:,admin-user:,admin-pass:"
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+RUNAS_USER="${RUNAS_USER:-postgres}"
+DATABASE_NAME="${DATABASE_CREATE:-$DATABASE_NAME}"
+DB_USER_NAME="${DB_USER_NAME:-$user_name}"
+DB_USER_PASS="${DB_USER_PASS:-$user_pass}"
+ADMIN_USER="${ADMIN_USER:-$root_user_name}"
+ADMIN_PASS="${ADMIN_PASS:-$root_user_pass}"
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Setup application options
+setopts=$(getopt -o "$SHORTOPTS" --long "$LONGOPTS" -n "$APPNAME" -- "$@" 2>/dev/null)
+eval set -- "${setopts[@]}" 2>/dev/null
+while :; do
+  case "$1" in
+  --database)
+    DATABASE_NAME="$2"
+    shift 2
+    ;;
+  --user-username)
+    DB_USER_NAME="$2"
+    shift 2
+    ;;
+  --user-password)
+    DB_USER_PASS="$2"
+    shift 2
+    ;;
+  --admin-user)
+    ADMIN_USER="$2"
+    shift 2
+    ;;
+  --admin-pass)
+    ADMIN_PASS="$2"
+    shift 2
+    ;;
+  --)
+    shift 1
+    break
+    ;;
+  *) shift ;;
+  esac
+done
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# begin main app
+if [ -n "$DATABASE_NAME" ]; then
+  sudo -u $RUNAS_USER psql <<-PGSQL_SCRIPT
+CREATE DATABASE IF NOT EXISTS $DATABASE_NAME;
+PGSQL_SCRIPT
+fi
+if [ "$DB_USER_NAME" != "root" ] && [ -n "$DB_USER_NAME" ]; then
+  sudo -u $RUNAS_USER psql <<-PGSQL_SCRIPT
+CREATE USER IF NOT EXISTS '$DB_USER_NAME'@'%' IDENTIFIED BY '$DB_USER_PASS';
+PGSQL_SCRIPT
+fi
+if [ "$DB_USER_NAME" != "root" ] && [ -n "$DATABASE_NAME" ]; then
+  sudo -u $RUNAS_USER psql <<-PGSQL_SCRIPT
+GRANT ALL PRIVILEGES ON $DATABASE_NAME.* TO '$DB_USER_NAME'@'%';
+PGSQL_SCRIPT
+elif [ "$DB_USER_NAME" = "root" ] && [ -n "$DATABASE_NAME" ]; then
+  sudo -u $RUNAS_USER psql <<-PGSQL_SCRIPT
+GRANT ALL PRIVILEGES ON $DATABASE_NAME.* TO 'root'@'localhost';
+PGSQL_SCRIPT
+fi
+sudo -u $RUNAS_USER psql <<-PGSQL_SCRIPT
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$ADMIN_PASS';
+FLUSH PRIVILEGES;
+PGSQL_SCRIPT
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# End application
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# lets exit with code
+exit
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# ex: ts=2 sw=2 et filetype=sh
